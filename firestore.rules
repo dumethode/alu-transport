@@ -1,0 +1,179 @@
+rules_version = '2';
+
+// ALU Transport security rules.
+// Students can only read and change their own data. Only approved drivers
+// can change rounds and post updates. Every write is checked field by field.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Email/password users must click the verification link first.
+    function verified() {
+      return signedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function hasProfile() {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function myRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isDriver() {
+      return hasProfile() && myRole() == 'driver';
+    }
+
+    function isStudent() {
+      return hasProfile() && myRole() == 'student';
+    }
+
+    // The transport office adds driver emails in the Firebase console.
+    function onDriverList() {
+      return request.auth.token.email != null &&
+        exists(/databases/$(database)/documents/driver_whitelist/$(request.auth.token.email.lower()));
+    }
+
+    function onlyKeys(allowed) {
+      return request.resource.data.keys().hasOnly(allowed);
+    }
+
+    function changedOnly(allowed) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowed);
+    }
+
+    function validName(name) {
+      return name is string && name.size() >= 2 && name.size() <= 40;
+    }
+
+    function validRound(d) {
+      return d.label is string && d.label.size() > 0 && d.label.size() <= 30
+        && d.period in ['morning', 'evening']
+        && d.departureTime is timestamp
+        && d.stopIds is list && d.stopIds.size() > 0
+        && d.status in ['planned', 'on_the_way', 'at_stop', 'delayed', 'full', 'ended']
+        && d.currentStopIndex is int
+        && d.seatsTotal is int && d.seatsTotal >= 1 && d.seatsTotal <= 60
+        && d.seatsLeft is int && d.seatsLeft >= 0 && d.seatsLeft <= d.seatsTotal
+        && d.driverId == request.auth.uid
+        && (d.note == null || (d.note is string && d.note.size() <= 120));
+    }
+
+    // ---------- users ----------
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+
+      allow create: if isOwner(uid) && verified()
+        && onlyKeys(['uid', 'fullName', 'email', 'role', 'pickupPointId',
+                     'avatarSeed', 'createdAt', 'updatedAt'])
+        && request.resource.data.uid == uid
+        && request.resource.data.email == request.auth.token.email
+        && validName(request.resource.data.fullName)
+        && (request.resource.data.role == 'student'
+            || (request.resource.data.role == 'driver' && onDriverList()));
+
+      // The role and email can never be changed after setup.
+      allow update: if isOwner(uid) && verified()
+        && changedOnly(['fullName', 'pickupPointId', 'avatarSeed', 'updatedAt'])
+        && validName(request.resource.data.fullName);
+
+      allow delete: if false;
+
+      match /reminders/{roundId} {
+        allow read, delete: if isOwner(uid);
+        allow create: if isOwner(uid) && verified()
+          && onlyKeys(['roundId', 'createdAt'])
+          && request.resource.data.roundId == roundId;
+        allow update: if false;
+      }
+    }
+
+    // ---------- pickup points ----------
+    match /pickup_points/{pointId} {
+      allow read: if signedIn();
+      allow create, update: if isDriver()
+        && onlyKeys(['name', 'order', 'minutesFromCampus'])
+        && request.resource.data.name is string
+        && request.resource.data.order is int
+        && request.resource.data.minutesFromCampus is int;
+      allow delete: if isDriver();
+    }
+
+    // ---------- rounds ----------
+    match /rounds/{roundId} {
+      allow read: if signedIn();
+
+      allow create: if isDriver()
+        && onlyKeys(['label', 'period', 'departureTime', 'stopIds', 'status',
+                     'currentStopIndex', 'seatsTotal', 'seatsLeft', 'driverId',
+                     'note', 'createdAt', 'updatedAt'])
+        && validRound(request.resource.data)
+        && request.resource.data.status == 'planned';
+
+      // A driver can only change his own rounds.
+      allow update: if isDriver()
+        && resource.data.driverId == request.auth.uid
+        && onlyKeys(['label', 'period', 'departureTime', 'stopIds', 'status',
+                     'currentStopIndex', 'seatsTotal', 'seatsLeft', 'driverId',
+                     'note', 'createdAt', 'updatedAt'])
+        && validRound(request.resource.data);
+
+      allow delete: if isDriver() && resource.data.driverId == request.auth.uid;
+    }
+
+    // ---------- status updates (alerts) ----------
+    match /status_updates/{updateId} {
+      allow read: if signedIn();
+
+      allow create: if isDriver()
+        && onlyKeys(['roundId', 'driverId', 'type', 'stopId', 'note', 'createdAt'])
+        && request.resource.data.driverId == request.auth.uid
+        && request.resource.data.type in ['leaving_campus', 'at_pickup', 'delayed',
+                                          'bus_full', 'round_ended', 'no_more_rounds']
+        && request.resource.data.createdAt == request.time
+        && exists(/databases/$(database)/documents/rounds/$(request.resource.data.roundId));
+
+      allow update: if false;
+      allow delete: if isDriver() && resource.data.driverId == request.auth.uid;
+    }
+
+    // ---------- update requests ----------
+    match /update_requests/{requestId} {
+      allow read: if signedIn()
+        && (resource.data.studentId == request.auth.uid || isDriver());
+
+      allow create: if isStudent() && verified()
+        && onlyKeys(['roundId', 'studentId', 'pickupPointId', 'status', 'reply',
+                     'createdAt', 'answeredAt'])
+        && request.resource.data.studentId == request.auth.uid
+        && request.resource.data.status == 'open'
+        && request.resource.data.reply == null
+        && request.resource.data.createdAt == request.time
+        && exists(/databases/$(database)/documents/rounds/$(request.resource.data.roundId));
+
+      // The driver may only add a reply; the student and round stay the same.
+      allow update: if isDriver()
+        && changedOnly(['status', 'reply', 'answeredAt'])
+        && request.resource.data.status == 'answered'
+        && request.resource.data.reply is string
+        && request.resource.data.reply.size() <= 80;
+
+      allow delete: if signedIn() && resource.data.studentId == request.auth.uid;
+    }
+
+    // ---------- approved drivers ----------
+    match /driver_whitelist/{email} {
+      allow read: if signedIn() && request.auth.token.email.lower() == email;
+      allow write: if false;
+    }
+  }
+}
