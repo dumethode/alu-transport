@@ -61,6 +61,7 @@ erDiagram
     }
     DRIVER_WHITELIST {
         string email PK "document id, lower case"
+        string addedBy "who approved the driver, e.g. transport office"
     }
 
     USERS ||--o{ REMINDERS : "sets (sub-collection users/uid/reminders)"
@@ -79,15 +80,15 @@ erDiagram
 
 ## How the ERD maps to Firestore
 
-| Entity           | Firestore path                    | Who can write (see `firestore.rules`)                                   |
-| ---------------- | --------------------------------- | ----------------------------------------------------------------------- |
-| USERS            | `users/{uid}`                     | Only the owner. Role and email cannot change after setup.               |
-| REMINDERS        | `users/{uid}/reminders/{roundId}` | Only the owner. Doc id = round id, so no duplicates.                    |
-| PICKUP_POINTS    | `pickup_points/{id}`              | Drivers only. Everyone signed in can read.                              |
-| ROUNDS           | `rounds/{id}`                     | The driver who owns the round. Seats must stay between 0 and the total. |
-| STATUS_UPDATES   | `status_updates/{id}`             | Drivers create and delete their own; nobody edits.                      |
-| UPDATE_REQUESTS  | `update_requests/{id}`            | Students create and delete their own; the driver can only add a reply.  |
-| DRIVER_WHITELIST | `driver_whitelist/{email}`        | Nobody from the app. The transport office adds emails in the console.   |
+| Entity           | Firestore path                    | Who can write (see `firestore.rules`)                                                                          |
+| ---------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| USERS            | `users/{uid}`                     | Only the owner. Role and email cannot change after setup.                                                      |
+| REMINDERS        | `users/{uid}/reminders/{roundId}` | Only the owner. Doc id = round id, so no duplicates.                                                           |
+| PICKUP_POINTS    | `pickup_points/{id}`              | Drivers only. Everyone signed in can read.                                                                     |
+| ROUNDS           | `rounds/{id}`                     | The driver who owns the round. Seats must stay between 0 and the total.                                        |
+| STATUS_UPDATES   | `status_updates/{id}`             | Drivers create and delete their own; nobody edits.                                                             |
+| UPDATE_REQUESTS  | `update_requests/{id}`            | Students create and delete their own; the driver can only add a reply.                                         |
+| DRIVER_WHITELIST | `driver_whitelist/{email}`        | Nobody from the app. The transport office adds emails in the console, with `addedBy` set to who approved them. |
 
 No data is copied between collections. Names (stop name, round name, driver
 name) are looked up by id when a screen shows them.
