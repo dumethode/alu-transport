@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../core/widgets/app_button.dart';
 import '../core/widgets/app_icon.dart';
-import '../core/widgets/responsive_body.dart';
 import '../core/widgets/state_views.dart';
 import '../features/auth/presentation/cubit/auth_cubit.dart';
 import '../features/auth/presentation/cubit/auth_state.dart';
 import '../features/auth/presentation/pages/login_screen.dart';
 import '../features/auth/presentation/pages/verify_email_screen.dart';
-import '../features/settings/presentation/pages/settings_screen.dart';
+import '../features/profile/presentation/cubit/profile_cubit.dart';
+import '../features/profile/presentation/cubit/profile_state.dart';
+import '../features/profile/presentation/pages/setup_screen.dart';
+import 'shell/driver_shell.dart';
+import 'shell/student_shell.dart';
 import 'splash_screen.dart';
 
-/// Chooses the first screen from the auth state (auth version).
+/// Chooses the first screen from the auth and profile state. Because the
+/// screen is picked from state (not pushed), the back button can never
+/// return to the login screen after signing in.
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
@@ -30,47 +34,48 @@ class AuthGate extends StatelessWidget {
           case AuthStatus.needsVerification:
             return const VerifyEmailScreen();
           case AuthStatus.signedIn:
-            return const _SignedInPlaceholder();
+            return const _ProfileGate();
         }
       },
     );
   }
 }
 
-/// Temporary home until the profile feature is merged.
-class _SignedInPlaceholder extends StatelessWidget {
-  const _SignedInPlaceholder();
+class _ProfileGate extends StatelessWidget {
+  const _ProfileGate();
 
   @override
   Widget build(BuildContext context) {
-    final String email = context.read<AuthCubit>().state.user?.email ?? '';
-    return Scaffold(
-      appBar: AppBar(title: const Text('ALU Transport')),
-      body: ResponsiveBody(
-        children: <Widget>[
-          MessageView(
-            icon: AppIcons.checkCircle,
-            title: 'You are signed in',
-            message: 'Signed in as $email. Setup comes next.',
-          ),
-          AppButton(
-            label: 'Open settings',
-            icon: AppIcons.settings,
-            variant: AppButtonVariant.outline,
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (BuildContext context) => const SettingsScreen(),
+    return BlocBuilder<ProfileCubit, ProfileState>(
+      buildWhen: (ProfileState previous, ProfileState current) =>
+          previous.status != current.status ||
+          previous.profile?.role != current.profile?.role,
+      builder: (BuildContext context, ProfileState state) {
+        switch (state.status) {
+          case ProfileStatus.initial:
+          case ProfileStatus.loading:
+            return const SplashScreen();
+          case ProfileStatus.missing:
+            return const SetupScreen();
+          case ProfileStatus.failure:
+            return Scaffold(
+              body: Center(
+                child: MessageView(
+                  icon: AppIcons.alertTriangle,
+                  title: 'Could not load your profile',
+                  message:
+                      'Check your internet connection, then sign in again.',
+                  actionLabel: 'Sign out',
+                  onAction: context.read<AuthCubit>().signOut,
+                ),
               ),
-            ),
-          ),
-          AppButton(
-            label: 'Sign out',
-            icon: AppIcons.logOut,
-            variant: AppButtonVariant.danger,
-            onPressed: context.read<AuthCubit>().signOut,
-          ),
-        ],
-      ),
+            );
+          case ProfileStatus.ready:
+            return state.profile!.isDriver
+                ? const DriverShell()
+                : const StudentShell();
+        }
+      },
     );
   }
 }
