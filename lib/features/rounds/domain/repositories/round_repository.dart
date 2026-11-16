@@ -18,6 +18,5 @@ abstract class RoundRepository {
     int? seatsLeft,
     String? note,
   });
-
   Future<void> deleteRound(String roundId);
 }

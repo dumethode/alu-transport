@@ -10,7 +10,6 @@ enum RoundStatus {
   ended('ended', 'Done');
 
   const RoundStatus(this.value, this.label);
-
   final String value;
   final String label;
 
@@ -20,7 +19,6 @@ enum RoundStatus {
       this == RoundStatus.atStop ||
       this == RoundStatus.delayed ||
       this == RoundStatus.full;
-
   static RoundStatus fromValue(String? value) {
     return RoundStatus.values.firstWhere(
       (RoundStatus status) => status.value == value,
@@ -34,7 +32,6 @@ enum RoundPeriod {
   evening('Evening');
 
   const RoundPeriod(this.label);
-
   final String label;
 }
 
@@ -54,7 +51,6 @@ class Round extends Equatable {
     this.note,
     this.updatedAt,
   });
-
   final String id;
   final String label;
   final RoundPeriod period;
@@ -73,9 +69,7 @@ class Round extends Equatable {
   final String driverId;
   final String? note;
   final DateTime? updatedAt;
-
   bool get isLive => status.isLive;
-
   bool get isFinished => status == RoundStatus.ended;
 
   /// Share of seats already taken, from 0.0 (empty) to 1.0 (full).
