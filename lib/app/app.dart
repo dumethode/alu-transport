@@ -7,6 +7,12 @@ import '../core/theme/app_theme.dart';
 import '../features/auth/data/repositories/firebase_auth_repository.dart';
 import '../features/auth/domain/repositories/auth_repository.dart';
 import '../features/auth/presentation/cubit/auth_cubit.dart';
+import '../features/profile/data/repositories/firestore_pickup_point_repository.dart';
+import '../features/profile/data/repositories/firestore_profile_repository.dart';
+import '../features/profile/domain/repositories/pickup_point_repository.dart';
+import '../features/profile/domain/repositories/profile_repository.dart';
+import '../features/profile/presentation/cubit/pickup_points_cubit.dart';
+import '../features/profile/presentation/cubit/profile_cubit.dart';
 import '../features/settings/data/repositories/shared_prefs_settings_repository.dart';
 import '../features/settings/domain/entities/app_settings.dart';
 import '../features/settings/domain/repositories/settings_repository.dart';
@@ -17,7 +23,7 @@ import 'session_listener.dart';
 /// Lets the session listener close pushed screens on sign in and out.
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
-/// Root widget (auth version). Profile and bus features are added next.
+/// Root widget (profile version). The bus features are added last.
 class AluTransportApp extends StatelessWidget {
   const AluTransportApp({super.key, required this.preferences});
 
@@ -34,6 +40,12 @@ class AluTransportApp extends StatelessWidget {
         RepositoryProvider<AuthRepository>(
           create: (BuildContext context) => FirebaseAuthRepository(),
         ),
+        RepositoryProvider<ProfileRepository>(
+          create: (BuildContext context) => FirestoreProfileRepository(),
+        ),
+        RepositoryProvider<PickupPointRepository>(
+          create: (BuildContext context) => FirestorePickupPointRepository(),
+        ),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -47,6 +59,14 @@ class AluTransportApp extends StatelessWidget {
           BlocProvider<AuthCubit>(
             create: (BuildContext context) =>
                 AuthCubit(context.read<AuthRepository>())..start(),
+          ),
+          BlocProvider<ProfileCubit>(
+            create: (BuildContext context) =>
+                ProfileCubit(context.read<ProfileRepository>()),
+          ),
+          BlocProvider<PickupPointsCubit>(
+            create: (BuildContext context) =>
+                PickupPointsCubit(context.read<PickupPointRepository>()),
           ),
         ],
         child: BlocBuilder<SettingsCubit, AppSettings>(
