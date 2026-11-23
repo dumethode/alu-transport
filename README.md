@@ -267,7 +267,7 @@ flutter test --coverage    # writes coverage/lcov.info
 | Requests | `StudentRequestCubit` (unit) |
 | Driver | `LiveChange`, `DriverRoundCubit` (unit) and the seats stepper (widget) |
 
-The tests use fake repositories, so they run without Firebase or the internet. The full list and how to read the coverage report are in [`docs/testing.md`](docs/testing.md).
+The tests use fake repositories, so they run without Firebase or the internet. Line coverage is 79.9% for the domain services and Cubits, and 74.4% across all code loaded by the tests. The full list and how to read the coverage report are in [`docs/testing.md`](docs/testing.md).
 
 ## How we worked as a team
 
