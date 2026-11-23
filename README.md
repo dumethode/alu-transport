@@ -111,7 +111,7 @@ ALU Transport fixes this. The driver taps one button ("Leaving campus", "At pick
 
 ## Demo video
 
-The demo video will be linked here after recording.
+**Watch the demo video:** https://youtu.be/nUmkU8nDRY4?si=vD68FbxvpIBeV1j3
 
 ## Architecture
 
